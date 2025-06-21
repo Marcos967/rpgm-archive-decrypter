@@ -9,18 +9,19 @@ use std::{
 #[derive(Parser, Debug)]
 #[command(
     about = "Extract encrypted .rgss RPG Maker archives.",
+    version,
     term_width = 120
 )]
 struct Cli {
     /// Path to the .rgss file or directory containing it.
-    #[arg(short, long, value_parser = value_parser!(PathBuf), default_value = "./", hide_default_value = true)]
+    #[arg(short, long, value_name = "INPUT_PATH", value_parser = value_parser!(PathBuf), default_value = "./", hide_default_value = true)]
     input_path: PathBuf,
 
-    /// Output directory.
-    #[arg(short, long, value_parser = value_parser!(PathBuf), default_value = "./", hide_default_value = true)]
-    output_path: PathBuf,
+    /// Output directory. Defaults to `input_path` if not set.
+    #[arg(short, long, value_name = "OUTPUT_PATH", value_parser = value_parser!(PathBuf))]
+    output_path: Option<PathBuf>,
 
-    /// Overwrite existing files.
+    /// Whether to overwrite existing files.
     #[arg(short, long, action = ArgAction::SetTrue)]
     force: bool,
 }
@@ -33,7 +34,15 @@ fn main() {
         panic!("Input path does not exist.");
     }
 
-    if !cli.output_path.exists() {
+    let output_path = cli.output_path.unwrap_or_else(|| {
+        if cli.input_path.is_file() {
+            cli.input_path.parent().unwrap().to_path_buf()
+        } else {
+            cli.input_path.clone()
+        }
+    });
+
+    if !output_path.exists() {
         panic!("Output path does not exist.");
     }
 
@@ -57,11 +66,14 @@ fn main() {
             .expect("No .rgss archive found in the directory.");
     }
 
-    let input_file_data: Vec<u8> = read(&cli.input_path).unwrap();
+    let mut decrypter = Decrypter::new().force(cli.force);
 
-    Decrypter::new(input_file_data)
-        .extract(&cli.output_path, cli.force)
-        .unwrap();
+    let input_file_data: Vec<u8> = read(&cli.input_path).unwrap();
+    let result = decrypter.extract(&input_file_data, &output_path).unwrap();
+
+    if let rpgmad_lib::ExtractOutcome::FilesExist = result {
+        println!("Output files already exist. Use --force to forcefully overwrite them.")
+    }
 
     println!("Elapsed: {:.2}s", start_time.elapsed().as_secs_f32());
 }
