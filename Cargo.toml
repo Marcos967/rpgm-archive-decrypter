@@ -1,10 +1,11 @@
 [package]
 name = "rpgmad"
-version = "3.0.0"
-edition = "2021"
+version = "4.0.0"
+edition = "2024"
 
 [dependencies]
-anyhow = "1.0.98"
-clap = { version = "4.5.41", features = ["wrap_help", "derive"] }
-clap_derive = "4.5.41"
-rpgmad-lib = "3.0.0"
+anyhow = "1.0.100"
+clap = { version = "4.5.53", features = ["wrap_help", "derive"] }
+clap_derive = "4.5.49"
+rpgmad-lib = { version = "4.0.0" }
+walkdir = "2.5.0"
