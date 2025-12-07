@@ -29,7 +29,7 @@ You can recongnize archives by their extensions: `rgssad`, `rgss2a`, `rgss3a`.
 
 ### Encryption
 
-`rpgmad` encrypts entries from `Data` and `Graphics` directories back to the archives.
+`rpgmad` encrypts entries from `Data` and `Graphics` directories (default behavior, directories can be altered using `--encrypt-dirs` and `--additional-encrypt-dirs` arguments) back to the archives.
 
 Encryption requires an `--engine` argument for proper encryption to the correct archive.
 
