@@ -18,6 +18,8 @@ use std::{
 };
 use walkdir::WalkDir;
 
+const STANDARD_ENCRYPT_DIRS: &[&str] = &["audio", "data", "fonts", "graphics"];
+
 #[derive(Parser, Debug)]
 #[command(
     about = "A tool to extract encrypted .rgss RPG Maker archives and encrypt RPG Maker assets back to archives.",
@@ -68,12 +70,22 @@ enum Command {
         /// Engine to produce proper archive
         #[arg(short, long, value_name = "ENGINE", value_parser = ["xp", "vx", "vxace"])]
         engine: String,
+
+        /// Directories to encrypt, separated by comma.
+        #[arg(short = 'E', long, value_name = "ENCRYPT_DIRS", value_parser = ["audio", "data", "fonts", "graphics"], value_delimiter = ',', default_value = "data,graphics")]
+        encrypt_dirs: Vec<String>,
+
+        /// Additional directories to encrypt outside the standard `encrypt_dirs` ones, separated by comma.
+        #[arg(
+            long,
+            value_name = "ADDITIONAL_ENCRYPT_DIRS",
+            value_delimiter = ','
+        )]
+        additional_encrypt_dirs: Option<Vec<String>>,
     },
 }
 
-const ENCRYPT_DIRS: &[&str] = &["Graphics", "Data"];
-
-fn decrypt_path(
+fn execute_decrypt(
     mut input_path: PathBuf,
     output_path: Option<PathBuf>,
 ) -> Result<()> {
@@ -130,10 +142,11 @@ fn decrypt_path(
     Ok(())
 }
 
-fn encrypt_path(
+fn execute_encrypt<'a, T: Iterator<Item = &'a mut String>>(
     input_path: &PathBuf,
     output_path: Option<&PathBuf>,
     engine: &str,
+    encrypt_dirs: T,
 ) -> Result<()> {
     if !input_path.exists() {
         bail!("Input path does not exist.");
@@ -164,10 +177,30 @@ fn encrypt_path(
 
     let mut archive_entries: Vec<ArchiveEntry> = Vec::with_capacity(128);
 
-    for dir in ENCRYPT_DIRS {
+    for dir in encrypt_dirs {
+        // Uppercase the first character in lowercased directory name, if it's standard.
+        // Non-standard should be correctly input by user.
+        if STANDARD_ENCRYPT_DIRS.contains(&dir.as_str()) {
+            unsafe {
+                dir.as_bytes_mut()[0] = dir.as_bytes()[0].to_ascii_uppercase();
+            }
+        }
+
         let subdir = input_path.join(dir);
 
-        if !subdir.is_dir() || !subdir.exists() {
+        if !subdir.is_dir() {
+            println!(
+                "{} is not a directory. It won't be encrypted.",
+                subdir.display()
+            );
+            continue;
+        }
+
+        if !subdir.exists() {
+            println!(
+                "{} does not exist. It won't be encrypted.",
+                subdir.display()
+            );
             continue;
         }
 
@@ -220,13 +253,22 @@ fn main() -> Result<()> {
         Command::Decrypt {
             input_path,
             output_path,
-        } => decrypt_path(input_path, output_path)?,
+        } => execute_decrypt(input_path, output_path)?,
 
         Command::Encrypt {
             input_path,
             output_path: output_file,
             engine,
-        } => encrypt_path(&input_path, output_file.as_ref(), &engine)?,
+            mut encrypt_dirs,
+            mut additional_encrypt_dirs,
+        } => execute_encrypt(
+            &input_path,
+            output_file.as_ref(),
+            &engine,
+            &mut encrypt_dirs.iter_mut().chain(
+                additional_encrypt_dirs.as_mut().unwrap_or(&mut Vec::new()),
+            ),
+        )?,
     }
 
     println!("Elapsed: {:.2}s", start_time.elapsed().as_secs_f32());
