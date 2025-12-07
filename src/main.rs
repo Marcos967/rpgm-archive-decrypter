@@ -180,7 +180,7 @@ fn encrypt_path(
                 continue;
             }
 
-            let relative_path = path.strip_prefix(&subdir).unwrap();
+            let relative_path = path.strip_prefix(input_path).unwrap();
 
             let data = read(path)?;
             archive_entries.push(ArchiveEntry {
