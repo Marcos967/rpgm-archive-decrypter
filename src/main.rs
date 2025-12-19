@@ -6,10 +6,11 @@
 #![allow(clippy::deref_addrof)]
 
 use anyhow::{Context, Result, bail};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, value_parser};
 use rpgmad_lib::{ArchiveEntry, Decrypter, Engine};
 use std::{
     borrow::Cow,
+    collections::HashSet,
     ffi::OsStr,
     fs::{create_dir_all, read, read_dir, write},
     io::stdin,
@@ -49,6 +50,10 @@ enum Command {
         /// Output directory. Defaults to `input_path` if not set.
         #[arg(short, long, value_name = "OUTPUT_PATH")]
         output_path: Option<PathBuf>,
+
+        /// Files to decrypt. When this is set, only specified files will be decrypted. This argument should be a list of files delimited by colon, e.g. "Data/Actors.rvdata2:Graphics/Animations/Animation1.png"
+        #[arg(short, long, value_name = "FILENAMES", default_value = "", value_parser = value_parser!(String), value_delimiter = ':')]
+        decrypt_files: Vec<String>,
     },
 
     /// Encrypt RPG Maker Data/Graphics assets to an archive
@@ -88,6 +93,7 @@ enum Command {
 fn execute_decrypt(
     mut input_path: PathBuf,
     output_path: Option<PathBuf>,
+    decrypt_files: &HashSet<String>,
 ) -> Result<()> {
     if !input_path.exists() {
         bail!("Input path does not exist.");
@@ -130,6 +136,11 @@ fn execute_decrypt(
 
     for file in decrypted_files {
         let path = String::from_utf8_lossy(&file.path);
+
+        if !decrypt_files.is_empty() && !decrypt_files.contains(path.as_ref()) {
+            continue;
+        }
+
         let output_file_path = output_path.join(path.as_ref());
 
         if let Some(parent) = output_file_path.parent() {
@@ -253,7 +264,12 @@ fn main() -> Result<()> {
         Command::Decrypt {
             input_path,
             output_path,
-        } => execute_decrypt(input_path, output_path)?,
+            decrypt_files,
+        } => execute_decrypt(
+            input_path,
+            output_path,
+            &HashSet::from_iter(decrypt_files),
+        )?,
 
         Command::Encrypt {
             input_path,
