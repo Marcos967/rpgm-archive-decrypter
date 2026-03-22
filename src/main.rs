@@ -9,7 +9,6 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, value_parser};
 use rpgmad_lib::{ArchiveEntry, Decrypter, Engine};
 use std::{
-    borrow::Cow,
     collections::HashSet,
     ffi::OsStr,
     fs::{create_dir_all, read, read_dir, write},
@@ -131,11 +130,11 @@ fn execute_decrypt(
     }
 
     let mut decrypter = Decrypter::new();
-    let archive_data = read(&input_path)?;
-    let decrypted_files = decrypter.decrypt(&archive_data)?;
+    let mut archive_data = read(&input_path)?;
+    let decrypted_files = decrypter.decrypt(&mut archive_data)?;
 
     for file in decrypted_files {
-        let path = String::from_utf8_lossy(&file.path);
+        let path = String::from_utf8_lossy(file.path);
 
         if !decrypt_files.is_empty() && !decrypt_files.contains(path.as_ref()) {
             continue;
@@ -188,6 +187,8 @@ fn execute_encrypt<'a, T: Iterator<Item = &'a mut String>>(
 
     let mut archive_entries: Vec<ArchiveEntry> = Vec::with_capacity(128);
 
+    let mut owned_data = Vec::with_capacity(0);
+
     for dir in encrypt_dirs {
         // Uppercase the first character in lowercased directory name, if it's standard.
         // Non-standard should be correctly input by user.
@@ -227,10 +228,13 @@ fn execute_encrypt<'a, T: Iterator<Item = &'a mut String>>(
             let relative_path = path.strip_prefix(input_path).unwrap();
 
             let data = read(path)?;
+            let path =  relative_path.as_os_str().as_encoded_bytes().to_vec();
+
+            owned_data.push((path, data));
+            let (path, data) = unsafe { (&*(&owned_data as *const Vec<(Vec<u8>, Vec<u8>)>)).last().unwrap_unchecked() };
+
             archive_entries.push(ArchiveEntry {
-                path: Cow::Owned(
-                    relative_path.as_os_str().as_encoded_bytes().to_vec(),
-                ),
+                path,
                 data,
             });
         }
@@ -242,17 +246,24 @@ fn execute_encrypt<'a, T: Iterator<Item = &'a mut String>>(
         );
     }
 
-    let mut decrypter = Decrypter::new();
-    let archive = decrypter.encrypt(
-        &archive_entries,
-        match engine {
+    let engine = match engine {
             "xp" | "vx" => Engine::Older,
             "vxace" => Engine::VXAce,
             _ => unreachable!(),
-        },
+        };
+
+    let mut decrypter = Decrypter::new();
+    let encrypted_data_size = Decrypter::encrypted_buffer_size(&archive_entries, engine);
+    let mut archive_buffer = Vec::new();
+    archive_buffer.resize(encrypted_data_size, 0);
+
+    let _ = decrypter.encrypt(
+        &archive_entries,
+        engine,
+        &mut archive_buffer
     );
 
-    write(output_file, archive)?;
+    write(output_file, archive_buffer)?;
     Ok(())
 }
 
