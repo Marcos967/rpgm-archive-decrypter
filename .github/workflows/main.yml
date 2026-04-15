@@ -5,7 +5,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -15,7 +15,7 @@ jobs:
           # Aqui ele compila usando o target específico do Android/Termux
           cargo build --release --target aarch64-linux-android
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rpgmad-android
           path: target/aarch64-linux-android/release/rpgmad
