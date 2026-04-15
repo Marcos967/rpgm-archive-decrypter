@@ -1,6 +1,6 @@
 name: Build ARM64 Binary
 
-on: [push, workflow_dispatch] # Executa ao dar push ou manualmente
+on: [push, workflow_dispatch]
 
 jobs:
   build:
@@ -12,16 +12,21 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-unknown-linux-gnu # Alvo para ARM64 Linux
+          targets: aarch64-unknown-linux-gnu
 
       - name: Install Cross-Compilation Tools
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build
+        env:
+          # Esta linha é o segredo: diz ao Cargo para usar o linker correto
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: cargo build --release --target aarch64-unknown-linux-gnu
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: decrypter-arm64
-          path: target/aarch64-unknown-linux-gnu/release/
+          path: target/aarch64-unknown-linux-gnu/release/rpgmad # Caminho direto para o binário
