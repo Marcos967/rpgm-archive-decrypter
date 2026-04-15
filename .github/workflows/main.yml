@@ -1,0 +1,22 @@
+name: Android Build
+on: workflow_dispatch # Permite rodar manualmente
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Build
+        run: |
+          # Aqui ele compila usando o target específico do Android/Termux
+          cargo build --release --target aarch64-linux-android
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: rpgmad-android
+          path: target/aarch64-linux-android/release/rpgmad
+          
